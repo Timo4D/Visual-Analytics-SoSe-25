@@ -12,7 +12,7 @@ import lime.lime_tabular
 
 # --- PAGE SETUP ---
 st.set_page_config(layout="wide")
-st.title("🧠 XAI-Dashboard zur Anomalieerkennung bei Hotelbuchungen")
+st.title("🏨 Booking cancellation anomalies")
 
 # --- LOAD DATA ---
 df = pd.read_csv("data/H1.csv")
@@ -45,7 +45,7 @@ df['Anomaly'] = iso_forest.fit_predict(X_scaled)
 df['Anomaly'] = df['Anomaly'].map({1: 0, -1: 1})  # 1 = Anomalie
 
 # --- UI: TABS ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Scatterplot", "🧪 Modellevaluation", "📌 Feature Importance", "🔎 SHAP", "🟢 LIME"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Overview", "🧪 Details", "📌 Feature Importance", "🔎 SHAP", "🟢 LIME"])
 
 # === TAB 1: SCATTERPLOT ===
 with tab1:

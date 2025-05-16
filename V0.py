@@ -12,10 +12,10 @@ import lime.lime_tabular
 
 # --- PAGE SETUP ---
 st.set_page_config(layout="wide")
-st.title("🏨 Booking cancellation anomalies")
+st.title("🧠 XAI-Dashboard zur Anomalieerkennung bei Hotelbuchungen")
 
 # --- LOAD DATA ---
-df = pd.read_csv("data/H1.csv")
+df = pd.read_csv("./data/H1.csv")
 df = df.drop(columns=['Company', 'Agent', 'ReservationStatusDate'], errors='ignore')
 
 # --- ENCODING ---
@@ -44,11 +44,16 @@ iso_forest = IsolationForest(n_estimators=100, contamination=0.05, random_state=
 df['Anomaly'] = iso_forest.fit_predict(X_scaled)
 df['Anomaly'] = df['Anomaly'].map({1: 0, -1: 1})  # 1 = Anomalie
 
+shap_explainer = shap.TreeExplainer(iso_forest)
+shap_values = shap_explainer.shap_values(X_scaled)
+
+left, right = st.columns(2)
+
 # --- UI: TABS ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Overview", "🧪 Details", "📌 Feature Importance", "🔎 SHAP", "🟢 LIME"])
+#tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Scatterplot", "🧪 Modellevaluation", "📌 Feature Importance", "🔎 SHAP", "🟢 LIME"])
 
 # === TAB 1: SCATTERPLOT ===
-with tab1:
+with left:
     st.header("Scatterplot mit Zielvariable oder Anomalien")
     
     col1, col2 = st.columns(2)
@@ -66,7 +71,7 @@ with tab1:
         st.pyplot(fig)
 
 # === TAB 2: MODELLEVALUATION ===
-with tab2:
+with right:
     st.header("Modellevaluation – Isolation Forest")
 
     anomalies = df[df['Anomaly'] == 1]
@@ -82,8 +87,23 @@ with tab2:
     sns.boxplot(x="Anomaly", y="LeadTime", data=df, ax=ax)
     st.pyplot(fig)
 
-# === TAB 3: FEATURE IMPORTANCE ===
-with tab3:
+
+# === TAB 4: SHAP ===
+
+st.header("SHAP Analyse")
+anomaly_index = df[df['Anomaly'] == 1].index[0]
+
+st.subheader("SHAP Force Plot")
+fig = shap.force_plot(shap_explainer.expected_value, shap_values[anomaly_index, :], features.columns, matplotlib=True, show=False)
+plt.tight_layout()
+st.pyplot(plt.gcf())
+
+
+
+left2, right2 = st.columns(2)
+
+    # === TAB 3: FEATURE IMPORTANCE ===
+with left2:
     st.header("Feature Importance Übersicht")
     st.markdown("🔍 Vergleich von Features, die für Modellentscheidungen wichtig sind.")
 
@@ -94,18 +114,9 @@ with tab3:
     shap.summary_plot(shap_values, features, feature_names=features.columns, show=False)
     st.pyplot(fig)
 
-# === TAB 4: SHAP ===
-with tab4:
-    st.header("SHAP Analyse")
-    anomaly_index = df[df['Anomaly'] == 1].index[0]
-
-    st.subheader("SHAP Force Plot")
-    fig = shap.force_plot(shap_explainer.expected_value, shap_values[anomaly_index, :], features.columns, matplotlib=True, show=False)
-    plt.tight_layout()
-    st.pyplot(plt.gcf())
 
 # === TAB 5: LIME ===
-with tab5:
+with right2:
     st.header("LIME Analyse")
     st.write("Lokale Erklärung eines Ausreißers")
 

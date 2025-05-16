@@ -6,6 +6,8 @@ import seaborn as sns
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
 import plotly.express as px
 import shap
 import lime.lime_tabular
@@ -39,10 +41,25 @@ df['PCA1'] = pca_2d[:, 0]
 df['PCA2'] = pca_2d[:, 1]
 df['PCA3'] = pca_3d[:, 2]
 
-# --- ANOMALY DETECTION ---
+# --- ANOMALY DETECTION mit Train-Test-Split ---
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, target, test_size=0.3, random_state=42, stratify=target
+)
+
 iso_forest = IsolationForest(n_estimators=100, contamination=0.05, random_state=42)
-df['Anomaly'] = iso_forest.fit_predict(X_scaled)
-df['Anomaly'] = df['Anomaly'].map({1: 0, -1: 1})  # 1 = Anomalie
+iso_forest.fit(X_train)
+
+# Anomalie-Prediction auf Testdaten
+y_pred = iso_forest.predict(X_test)
+y_pred = np.where(y_pred == -1, 1, 0)
+
+# Evaluation (Optional im Dashboard)
+report = classification_report(y_test, y_pred, output_dict=True)
+report_df = pd.DataFrame(report).transpose()
+
+# Predict für alle
+df['Anomaly'] = iso_forest.predict(X_scaled)
+df['Anomaly'] = df['Anomaly'].map({1: 0, -1: 1}).astype(int)
 
 shap_explainer = shap.TreeExplainer(iso_forest)
 shap_values = shap_explainer.shap_values(X_scaled)

@@ -18,8 +18,6 @@ st.title("🧠 XAI-Dashboard zur Anomalieerkennung bei Hotelbuchungen")
 encoders       = joblib.load('notebooks/artifacts/encoders.joblib')
 feature_names  = json.load(open('notebooks/artifacts/feature_names.json', 'r'))
 scaler         = joblib.load('notebooks/artifacts/scaler.joblib')
-pca2           = joblib.load('notebooks/artifacts/pca2.joblib')
-pca3           = joblib.load('notebooks/artifacts/pca3.joblib')
 iso_forest     = joblib.load('notebooks/artifacts/iso_forest.joblib')
 shap_explainer = joblib.load('notebooks/artifacts/shap_explainer.joblib')
 shap_values    = np.load('notebooks/artifacts/shap_values.npy', allow_pickle=True)
@@ -34,10 +32,8 @@ df = df.drop(columns=['Company', 'Agent', 'ReservationStatusDate'], errors='igno
 for col, le in encoders.items():
     df[col] = le.transform(df[col].astype(str))
 
-# --- SCALE & PCA ---
+# --- SCALE ---
 X_scaled = scaler.transform(df[feature_names])
-df['PCA1'], df['PCA2'] = pca2.transform(X_scaled).T
-df['PCA3'] = pca3.transform(X_scaled)[:, 2]
 
 # --- ANOMALY PREDICTION ---
 df['Anomaly'] = (iso_forest.predict(X_scaled) == -1).astype(int)
@@ -46,14 +42,25 @@ df['Anomaly'] = (iso_forest.predict(X_scaled) == -1).astype(int)
 left, right = st.columns(2)
 
 with left:
-    st.header("Scatterplot mit Zielvariable oder Anomalien")
     col1, col2 = st.columns(2)
     with col1:
-        variable = st.selectbox("Exogene Variable auswählen", df.columns)
+        x_var = st.selectbox("Feature für die X-Achse auswählen", df.columns, index=df.columns.get_loc("LeadTime"))
     with col2:
-        mode = st.radio("Färbung", ["Zielvariable (IsCanceled)", "Anomalien (Isolation Forest)"])
-    color_var = 'IsCanceled' if mode.startswith('Zielvariable') else 'Anomaly'
-    fig = px.scatter(df, x='PCA1', y='PCA2', color=df[color_var].astype(str), title=f'Scatterplot gefärbt nach {color_var}')
+        y_var = st.selectbox("Feature für die Y-Achse auswählen", df.columns, index=df.columns.get_loc("StaysInWeekNights"))
+        
+    mode = st.radio(
+        "Färbung",
+        ["Zielvariable (IsCanceled)", "Anomalien (Isolation Forest)"]
+    )
+    color_var = "IsCanceled" if mode.startswith("Zielvariable") else "Anomaly"
+    
+    fig = px.scatter(
+        df,
+        x=x_var,
+        y=y_var,
+        color=df[color_var].astype(str),
+        title=f"Scatterplot: {x_var} vs. {y_var} – gefärbt nach {color_var}"
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 with right:
@@ -83,7 +90,8 @@ plt.tight_layout()
 st.pyplot(plt.gcf())
 
 # FEATURE IMPORTANCE
-tab1, tab2 = st.tabs(["Feature Importance", "LIME"])
+# tab1, tab2 = st.tabs(["Feature Importance", "LIME"])
+tab1, tab2 = st.columns(2)
 with tab1:
     st.header("Feature Importance Übersicht")
     fig, ax = plt.subplots(figsize=(10,6))
@@ -107,6 +115,6 @@ with tab2:
     fig = lime_exp.as_pyplot_figure()
     st.pyplot(fig)
 
-    st.subheader("Top Features laut LIME")
-    for feature, importance in lime_exp.as_list():
-        st.write(f"{feature}: {importance:.4f}")
+    # st.subheader("Top Features laut LIME")
+    # for feature, importance in lime_exp.as_list():
+    #     st.write(f"{feature}: {importance:.4f}")

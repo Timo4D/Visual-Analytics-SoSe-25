@@ -1,3 +1,4 @@
+# streamlit_app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -10,8 +11,9 @@ import dill
 import shap
 
 # --- PAGE SETUP ---
-st.set_page_config(layout="wide", menu_items={}, page_title="XAI Dashboard", page_icon="🧠")
-st.title("🧠 XAI-Dashboard zur Anomalieerkennung bei Hotelbuchungen")
+st.set_page_config(layout="wide", menu_items={}, page_title="XAI Dashboard", page_icon="🏨")
+st.title("🏨 Hotel Booking Anomalies")
+#st.set_page_config(layout="wide")
 
 hide_streamlit_style = """
     <style>
@@ -64,23 +66,77 @@ tabs = st.tabs([
 
 # --- TAB 1: Datenübersicht ---
 with tabs[0]:
-    left, right = st.columns(2)
-    with left:
-        st.subheader("Streudiagramm")
-        col1, col2 = st.columns(2)
-        with col1:
-            x_var = st.selectbox("X-Achse", df.columns, index=df.columns.get_loc("LeadTime"))
-        with col2:
-            y_var = st.selectbox("Y-Achse", df.columns, index=df.columns.get_loc("StaysInWeekNights"))
-        mode = st.radio("Färbung", ["IsCanceled", "Anomalien"], horizontal=True)
-        color_var = "IsCanceled" if mode=="IsCanceled" else "Anomaly"
-        fig = px.scatter(df, x=x_var, y=y_var, color=df[color_var].astype(str),
-                        title=f"{x_var} vs {y_var} – gefärbt nach {color_var}")
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-    with right:
-        df
+    st.subheader("Instanzanalyse")
+
+    selected_indices = st.multiselect(
+        "Wähle bis zu 5 Instanzen",
+        options=df.index.tolist(),
+        default=[df[df["Anomaly"] == 1].index[0]],
+        max_selections=5
+    )
+
+    if selected_indices:
+        for idx in selected_indices:
+            inst = df.loc[idx]
+            st.markdown(f"### Instanz {idx}")
+
+            col1, col2, col3 = st.columns([1, 1, 2])
+            with col1:
+                st.markdown("**Ground Truth**")
+                truth = "Anomaly" if inst["Anomaly"] else "Normal"
+                st.write(truth)
+
+            with col2:
+                st.markdown("**Prediction**")
+                pred = iso_forest.predict([X_scaled[idx]])[0]
+                pred_label = "Anomaly" if pred == -1 else "Normal"
+                correct = pred == -1 if inst["Anomaly"] else pred != -1
+                st.write(f"{pred_label} – {'✔️ korrekt' if correct else '❌ falsch'}")
+
+            with col3:
+                st.markdown("**Feature-Werte**")
+                st.dataframe(inst[feature_names].to_frame().T, use_container_width=True, height=120)
+
+            shap_col, lime_col = st.columns(2)
+            with shap_col:
+                st.markdown("**SHAP Force Plot**")
+                shap_fig = shap.force_plot(
+                    shap_explainer.expected_value,
+                    shap_values[idx],
+                    feature_names=feature_names,
+                    matplotlib=True,
+                    show=False
+                )
+                st.pyplot(shap_fig)
+
+            with lime_col:
+                st.markdown("**LIME Analyse**")
+                def predict_proba(X):
+                    raw = iso_forest.decision_function(X)
+                    norm = (raw - raw.min()) / (raw.max() - raw.min())
+                    return np.vstack([1 - norm, norm]).T
+
+                lime_exp = lime_explainer.explain_instance(
+                    X_scaled[idx],
+                    predict_proba,
+                    num_features=10
+                )
+                st.pyplot(lime_exp.as_pyplot_figure())
+
+    # Unterer Bereich: Scatterplot
+    st.markdown("---")
+    st.subheader("Streudiagramm")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        x_var = st.selectbox("X-Achse", df.columns, index=df.columns.get_loc("LeadTime"))
+    with col2:
+        y_var = st.selectbox("Y-Achse", df.columns, index=df.columns.get_loc("StaysInWeekNights"))
+    mode = st.radio("Färbung", ["IsCanceled", "Anomalien"], horizontal=True)
+    color_var = "IsCanceled" if mode == "IsCanceled" else "Anomaly"
+    fig = px.scatter(df, x=x_var, y=y_var, color=df[color_var].astype(str),
+                     title=f"{x_var} vs {y_var} – gefärbt nach {color_var}")
+    st.plotly_chart(fig, use_container_width=True)
 
 # --- TAB 2: Modellevaluation ---
 with tabs[1]:

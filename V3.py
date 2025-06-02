@@ -60,12 +60,26 @@ df['Anomaly'] = (iso_forest.predict(X_scaled) == -1).astype(int)
 
 tabs = st.tabs([
     "1. Datenübersicht",
-    "2. Modellevaluation",
-    "3. Erklärungen"  
+    "2. Modellevaluation", 
 ])
 
 # --- TAB 1: Datenübersicht ---
 with tabs[0]:
+    
+    st.subheader("Streudiagramm")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        x_var = st.selectbox("X-Achse", df.columns, index=df.columns.get_loc("LeadTime"))
+    with col2:
+        y_var = st.selectbox("Y-Achse", df.columns, index=df.columns.get_loc("StaysInWeekNights"))
+    color_var = "IsCanceled" 
+    fig = px.scatter(df, x=x_var, y=y_var, color=df[color_var].astype(str),
+                     title=f"{x_var} vs {y_var} – gefärbt nach {color_var}")
+    st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
+    
     st.subheader("Instanzanalyse")
 
     selected_indices = st.multiselect(
@@ -99,47 +113,38 @@ with tabs[0]:
 
             shap_col, lime_col = st.columns(2)
             with shap_col:
-                st.markdown("**SHAP Force Plot**")
-                shap_fig = shap.force_plot(
-                    shap_explainer.expected_value,
-                    shap_values[idx],
-                    feature_names=feature_names,
-                    matplotlib=True,
-                    show=False
-                )
-                st.pyplot(shap_fig)
+                with st.expander("SHAP Summary (Feature-Importance)"):
+                    st.markdown("**SHAP Force Plot**")
+                    shap_fig = shap.force_plot(
+                        shap_explainer.expected_value,
+                        shap_values[idx],
+                        feature_names=feature_names,
+                        matplotlib=True,
+                        show=False
+                    )
+                    st.pyplot(shap_fig)
 
             with lime_col:
-                st.markdown("**LIME Analyse**")
-                def predict_proba(X):
-                    raw = iso_forest.decision_function(X)
-                    norm = (raw - raw.min()) / (raw.max() - raw.min())
-                    return np.vstack([1 - norm, norm]).T
+                with st.expander("SHAP Summary (Feature-Importance)"):
+                    st.markdown("**LIME Analyse**")
+                    def predict_proba(X):
+                        raw = iso_forest.decision_function(X)
+                        norm = (raw - raw.min()) / (raw.max() - raw.min())
+                        return np.vstack([1 - norm, norm]).T
 
-                lime_exp = lime_explainer.explain_instance(
-                    X_scaled[idx],
-                    predict_proba,
-                    num_features=10
-                )
-                st.pyplot(lime_exp.as_pyplot_figure())
+                    lime_exp = lime_explainer.explain_instance(
+                        X_scaled[idx],
+                        predict_proba,
+                        num_features=10
+                    )
+                    st.pyplot(lime_exp.as_pyplot_figure())
 
     # Unterer Bereich: Scatterplot
-    st.markdown("---")
-    st.subheader("Streudiagramm")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        x_var = st.selectbox("X-Achse", df.columns, index=df.columns.get_loc("LeadTime"))
-    with col2:
-        y_var = st.selectbox("Y-Achse", df.columns, index=df.columns.get_loc("StaysInWeekNights"))
-    mode = st.radio("Färbung", ["IsCanceled", "Anomalien"], horizontal=True)
-    color_var = "IsCanceled" if mode == "IsCanceled" else "Anomaly"
-    fig = px.scatter(df, x=x_var, y=y_var, color=df[color_var].astype(str),
-                     title=f"{x_var} vs {y_var} – gefärbt nach {color_var}")
-    st.plotly_chart(fig, use_container_width=True)
+    
 
 # --- TAB 2: Modellevaluation ---
 with tabs[1]:
+    
     st.subheader("Metric-Übersicht")
     anomalies = df[df["Anomaly"]==1]
     normals   = df[df["Anomaly"]==0]
@@ -152,43 +157,3 @@ with tabs[1]:
     sns.boxplot(x="Anomaly", y="LeadTime", data=df, ax=ax)
     st.pyplot(fig)
 
-with tabs[2]:
-    st.header("Erklärungen")
-
-    # SHAP Force-Plot
-    with st.expander("SHAP Force-Plot"):
-        anomaly_idx = df[df["Anomaly"]==1].index[0]
-        fig = shap.force_plot(
-            shap_explainer.expected_value,
-            shap_values[anomaly_idx],
-            feature_names=feature_names,
-            matplotlib=True,
-            show=False
-        )
-        plt.tight_layout()
-        st.pyplot(fig)
-
-    # SHAP Summary (Feature Importance)
-    with st.expander("SHAP Summary (Feature-Importance)"):
-        fig, ax = plt.subplots(figsize=(10,6))
-        shap.summary_plot(
-            shap_values,
-            pd.DataFrame(X_scaled, columns=feature_names),
-            feature_names=feature_names,
-            show=False
-        )
-        st.pyplot(fig)
-
-    # LIME Analyse
-    with st.expander("LIME Analyse"):
-        def predict_proba(X):
-            raw = iso_forest.decision_function(X)
-            norm = (raw - raw.min())/(raw.max()-raw.min())
-            return np.vstack([1-norm, norm]).T
-
-        lime_exp = lime_explainer.explain_instance(
-            X_scaled[anomaly_idx],
-            predict_proba,
-            num_features=10
-        )
-        st.pyplot(lime_exp.as_pyplot_figure())

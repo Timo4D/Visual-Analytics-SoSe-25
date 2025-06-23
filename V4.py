@@ -32,9 +32,7 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # --- LOAD ARTIFACTS ---
-encoders       = joblib.load('notebooks/artifacts/encoders.joblib')
 feature_names  = json.load(open('notebooks/artifacts/feature_names.json', 'r'))
-scaler         = joblib.load('notebooks/artifacts/scaler.joblib')
 iso_forest     = joblib.load('notebooks/artifacts/iso_forest.joblib')
 shap_explainer = joblib.load('notebooks/artifacts/shap_explainer.joblib')
 shap_values    = np.load('notebooks/artifacts/shap_values.npy', allow_pickle=True)
@@ -42,18 +40,12 @@ with open('notebooks/artifacts/lime_explainer.pkl', 'rb') as f:
     lime_explainer = dill.load(f)
 
 # --- LOAD DATA ---
-df = pd.read_csv("./data/H1.csv")
-df = df.drop(columns=['Company', 'Agent', 'ReservationStatusDate'], errors='ignore')
+df = pd.read_csv("notebooks/artifacts/processed_data.csv")
 
-# --- APPLY ENCODING ---
-for col, le in encoders.items():
-    df[col] = le.transform(df[col].astype(str))
-
-# --- SCALE ---
-X_scaled = scaler.transform(df[feature_names])
 
 # --- ANOMALY PREDICTION ---
-df['Anomaly'] = (iso_forest.predict(X_scaled) == -1).astype(int)
+features = df.drop(columns=['IsCanceled'])
+df['Anomaly'] = (iso_forest.predict(features) == -1).astype(int)
 
 
 
@@ -84,7 +76,7 @@ with tabs[0]:
     selected_indices = st.multiselect(
         "Wähle bis zu 5 Instanzen",
         options=df.index.tolist(),
-        default=[df[df["Anomaly"] == 1].index[0]],
+        default=[df[df["Anomaly"] == 1].index[0] if any(df["Anomaly"] == 1) else df.index[0]],
         max_selections=5
     )
 
@@ -101,9 +93,10 @@ with tabs[0]:
 
             with col2:
                 st.markdown("**Prediction**")
-                pred = iso_forest.predict([X_scaled[idx]])[0]
+                raw_feat = features.iloc[idx].values.reshape(1, -1)
+                pred = iso_forest.predict(raw_feat)[0]
                 pred_label = "Anomaly" if pred == -1 else "Normal"
-                correct = pred == -1 if inst["Anomaly"] else pred != -1
+                correct = (pred == -1) == bool(inst["Anomaly"])
                 st.write(f"{pred_label} – {'✔️ korrekt' if correct else '❌ falsch'}")
 
             with col3:
@@ -112,11 +105,11 @@ with tabs[0]:
 
             shap_col, lime_col = st.columns(2)
             with shap_col:
-                with st.expander("SHAP Summary (Feature-Importance)"):
-                    st.markdown("**SHAP Force Plot**")
+                with st.expander("SHAP Force Plot"):
                     shap_fig = shap.force_plot(
                         shap_explainer.expected_value,
                         shap_values[idx],
+                        features.iloc[idx],
                         feature_names=feature_names,
                         matplotlib=True,
                         show=False
@@ -124,15 +117,14 @@ with tabs[0]:
                     st.pyplot(shap_fig)
 
             with lime_col:
-                with st.expander("SHAP Summary (Feature-Importance)"):
-                    st.markdown("**LIME Analyse**")
+                with st.expander("LIME Analyse"):
                     def predict_proba(X):
                         raw = iso_forest.decision_function(X)
                         norm = (raw - raw.min()) / (raw.max() - raw.min())
                         return np.vstack([1 - norm, norm]).T
 
                     lime_exp = lime_explainer.explain_instance(
-                        X_scaled[idx],
+                        features.iloc[idx].values,
                         predict_proba,
                         num_features=10
                     )
@@ -143,7 +135,6 @@ with tabs[0]:
 
 # --- TAB 2: Modellevaluation ---
 with tabs[1]:
-    
     st.subheader("Datensatz übersicht")
     anomalies = df[df["Anomaly"]==0]
     normals   = df[df["Anomaly"]==1]

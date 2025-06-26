@@ -1,2 +1,2 @@
 #!/bin/bash
-streamlit run appV5.py --server.port=$PORT --server.enableCORS=false
+streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --server.enableCORS=false

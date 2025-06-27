@@ -23,4 +23,5 @@ streamlit run Dashboard.py
 
 -> http://localhost:8501/
 
+-> Verwendete Python Version: 3.13.3
 -> Bei Problemen notebooks/precompute.ipynb durchlaufen lassen

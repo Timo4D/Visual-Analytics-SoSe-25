@@ -12,12 +12,14 @@ Kilian Mütz (79561) und Timo Gerstenhauer (86164)
 
 ## Um das Dasboard zu starten
 
+```bash
 git clone https://github.com/Timo4D/Visual-Analytics-SoSe-25.git
 cd Visual-Analytics-SoSe-25
 python -m venv .venv
-source ./venv/bin/activate
+source .venv/bin/activate
 pip install -r requirements.txt
 streamlit run Dashboard.py
+```
 
 -> http://localhost:8501/
 

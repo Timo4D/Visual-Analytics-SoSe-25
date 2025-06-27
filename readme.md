@@ -9,3 +9,16 @@ Kilian Mütz (79561) und Timo Gerstenhauer (86164)
 ## Data Understanding
 - Der Datensatz wurde als CSV "H1" geladen
 - Es existieren 31 Variablen mit ~40.000 Beobachtungen
+
+## Um das Dasboard zu starten
+
+git clone https://github.com/Timo4D/Visual-Analytics-SoSe-25.git
+cd Visual-Analytics-SoSe-25
+python -m venv .venv
+source ./venv/bin/activate
+pip install -r requirements.txt
+streamlit run Dashboard.py
+
+-> http://localhost:8501/
+
+-> Bei Problemen notebooks/precompute.ipynb durchlaufen lassen
